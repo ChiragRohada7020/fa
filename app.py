@@ -42,13 +42,23 @@ _SCHEDULER_STARTED = False
 
 def _collection():
     cfg = get_config()
-    client = MongoClient(cfg["mongo_uri"])
+    client = MongoClient(
+        cfg["mongo_uri"],
+        serverSelectionTimeoutMS=3000,
+        connectTimeoutMS=3000,
+        socketTimeoutMS=3000,
+    )
     return client[DB_NAME][COLLECTION_NAME]
 
 
 def _tracked_collection():
     cfg = get_config()
-    client = MongoClient(cfg["mongo_uri"])
+    client = MongoClient(
+        cfg["mongo_uri"],
+        serverSelectionTimeoutMS=3000,
+        connectTimeoutMS=3000,
+        socketTimeoutMS=3000,
+    )
     return client[DB_NAME][TRACKED_COLLECTION_NAME]
 
 
