@@ -1,0 +1,7 @@
+{
+  "groq_api_key": "paste_your_groq_api_key_here",
+  "groq_model": "llama-3.3-70b-versatile",
+  "mongo_uri": "mongodb://localhost:27017/",
+  "smtp_email": "your_email@example.com",
+  "smtp_app_password": "paste_app_password_here"
+}

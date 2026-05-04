@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Your Smart Text Board</h1>
+      <p>Add any important text quickly and keep everything in one beautiful place.</p>
+    </section>
+
+    <section class="panel input-panel">
+      <form action="{{ url_for('add_text') }}" method="post">
+        <label for="content">Add Text</label>
+        <textarea id="content" name="content" rows="4" placeholder="Type your text here..." required></textarea>
+        <button type="submit">Save Text</button>
+      </form>
+      {% if error %}
+        <p class="error-msg">{{ error }}</p>
+      {% endif %}
+    </section>
+
+    {% if latest_result %}
+      <section class="panel result-panel">
+        <div class="panel-header">
+          <h2>Latest AI Result</h2>
+          <span class="count">Live check</span>
+        </div>
+
+        <div class="result-grid">
+          <div class="result-block">
+            <h3>Parsed Data</h3>
+            <p><strong>Raw:</strong> {{ latest_result.raw_text }}</p>
+            <p><strong>Product:</strong> {{ latest_result.parsed.product }}</p>
+            <p><strong>Quantity:</strong> {{ latest_result.parsed.quantity or 'N/A' }}</p>
+            <p><strong>Target Price:</strong> Rs {{ latest_result.parsed.target_price if latest_result.parsed.target_price is not none else 'N/A' }}</p>
+          </div>
+
+          <div class="result-block">
+            <h3>Top 3 Effective Price Offers</h3>
+            {% if latest_result.error %}
+              <p>{{ latest_result.error }}</p>
+            {% elif latest_result.top_offers %}
+              {% for p in latest_result.top_offers %}
+                <div class="card" style="margin-top: 8px;">
+                  <p><strong>{{ loop.index }}. {{ p.title }}</strong> {% if p.best_offer %}<span class="deal-ok">BEST</span>{% endif %}</p>
+                  <p>Final: Rs {{ p.final_price }} | Total Qty: {{ p.total_quantity }} {{ p.unit }}</p>
+                  <p>Unit Price: Rs {{ p.price_per_unit }}/{{ p.unit }} | Effective(Req): Rs {{ p.effective_price_for_requested_qty }}</p>
+                  <p><a href="{{ p.url }}" target="_blank" rel="noopener">Open Product</a></p>
+                </div>
+              {% endfor %}
+              {% if latest_result.best_offer %}
+                <p class="{{ 'deal-ok' if latest_result.best_offer.is_deal else 'deal-no' }}" style="margin-top: 10px;">
+                  {{ 'DEAL FOUND' if latest_result.best_offer.is_deal else 'No deal yet' }}
+                </p>
+              {% endif %}
+            {% else %}
+              <p>No comparable products found.</p>
+            {% endif %}
+
+            {% if latest_result.debug %}
+              <div class="debug-box">
+                <p><strong>Debug Query:</strong> {{ latest_result.debug.query }}</p>
+                <p><strong>URLs Found:</strong> {{ latest_result.debug.urls|length if latest_result.debug.urls else 0 }}</p>
+                {% if latest_result.debug.scrape_attempts %}
+                  <ul>
+                    {% for d in latest_result.debug.scrape_attempts %}
+                      <li>{{ d.status }} - {{ d.url }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if latest_result.products %}
+          <div class="result-block" style="margin-top: 12px;">
+            <h3>All Matched Products</h3>
+            {% for p in latest_result.products %}
+              <div class="card" style="margin-top: 8px;">
+                <p><strong>{{ p.title }}</strong> {% if p.best_offer %}<span class="deal-ok">BEST OFFER</span>{% endif %}</p>
+                <p>Final: Rs {{ p.final_price }} | Total Qty: {{ p.total_quantity }} {{ p.unit }}</p>
+                <p>Unit Price: Rs {{ p.price_per_unit }}/{{ p.unit }} | Effective(Req): Rs {{ p.effective_price_for_requested_qty }}</p>
+                <p><a href="{{ p.url }}" target="_blank" rel="noopener">Open Product</a></p>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    <section class="panel list-panel">
+      <div class="panel-header">
+        <h2>Saved Texts</h2>
+        <span class="count">{{ texts|length }} items</span>
+      </div>
+
+      {% if texts %}
+        <div class="cards">
+          {% for item in texts %}
+            <article class="card">
+              <p class="content">{{ item.content }}</p>
+              <div class="card-footer">
+                <small>
+                  {{ item.created_at.strftime('%d %b %Y, %I:%M %p') if item.created_at else '' }}
+                </small>
+                <form action="{{ url_for('toggle_notify', text_id=item._id) }}" method="post">
+                  <button class="delete-btn" type="submit">
+                    {{ 'Notify ON' if item.notify_enabled else 'Notify' }}
+                  </button>
+                </form>
+                <form action="{{ url_for('delete_text', text_id=item._id) }}" method="post">
+                  <button class="delete-btn" type="submit">Delete</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <p>No text added yet. Start by adding your first note.</p>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="panel list-panel">
+      <div class="panel-header">
+        <h2>Tracked (Notify ON)</h2>
+        <span class="count">{{ tracked_rows|length if tracked_rows else 0 }} items</span>
+      </div>
+      {% if tracked_rows %}
+        {% for t in tracked_rows %}
+          <article class="card" style="margin-bottom: 10px;">
+            <p class="content"><strong>{{ t.normalized_query }}</strong></p>
+            <p>Latest Scan: {{ t.latest_scan_at.strftime('%d %b %Y, %I:%M %p') if t.latest_scan_at else 'N/A' }}</p>
+            {% if t.latest_top3 %}
+              <p><strong>Latest Top 3:</strong></p>
+              {% for p in t.latest_top3 %}
+                <p>{{ loop.index }}. Rs {{ p.effective_price_for_requested_qty }} | {{ p.title }}</p>
+              {% endfor %}
+            {% else %}
+              <p>No latest top 3 yet.</p>
+            {% endif %}
+            {% if t.price_history %}
+              <p><strong>Recent snapshots:</strong></p>
+              {% for h in t.price_history[-3:]|reverse %}
+                <p>{{ h.checked_at.strftime('%d %b %I:%M %p') if h.checked_at else 'N/A' }} - best effective: Rs {{ (h.best.effective_price_for_requested_qty if h.best else 'N/A') }}</p>
+              {% endfor %}
+            {% endif %}
+          </article>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <p>No notify-enabled tracked queries yet.</p>
+        </div>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
