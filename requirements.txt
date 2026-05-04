@@ -2,3 +2,4 @@ flask
 pymongo
 requests
 beautifulsoup4
+gunicorn
