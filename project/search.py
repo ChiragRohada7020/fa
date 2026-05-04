@@ -1,4 +1,5 @@
 import re
+import os
 from typing import List
 from urllib.parse import quote_plus
 from urllib.parse import unquote, urljoin, urlparse
@@ -39,7 +40,7 @@ def _bing_search(product_query: str, max_results: int) -> List[str]:
     query = quote_plus(f"{product_query} site:amazon.in OR site:flipkart.com")
     url = f"https://www.bing.com/search?q={query}"
 
-    response = requests.get(url, headers=SEARCH_HEADERS, timeout=20)
+    response = requests.get(url, headers=SEARCH_HEADERS, timeout=8)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -60,7 +61,7 @@ def _flipkart_site_search(product_query: str, max_results: int) -> List[str]:
     starts = [0, 24, 48, 72, 96, 120, 144, 168, 192]
     for start in starts:
         url = f"https://www.flipkart.com/search?q={query}&start={start}"
-        response = requests.get(url, headers=SEARCH_HEADERS, timeout=20)
+        response = requests.get(url, headers=SEARCH_HEADERS, timeout=8)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -82,7 +83,7 @@ def _flipkart_site_search(product_query: str, max_results: int) -> List[str]:
 def _amazon_site_search(product_query: str, max_results: int) -> List[str]:
     query = quote_plus(product_query)
     url = f"https://www.amazon.in/s?k={query}"
-    response = requests.get(url, headers=SEARCH_HEADERS, timeout=20)
+    response = requests.get(url, headers=SEARCH_HEADERS, timeout=8)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -107,11 +108,16 @@ def search_product_urls(product_query: str, max_results: int = 5) -> List[str]:
     merged: List[str] = []
     seen = set()
 
-    # Prefer direct site search first (more product-accurate), then Bing.
-    for provider in (_flipkart_site_search, _amazon_site_search, _bing_search):
+    use_amazon = os.getenv("ENABLE_AMAZON_SEARCH", "0").strip().lower() in {"1", "true", "yes"}
+    providers = [_flipkart_site_search, _bing_search]
+    if use_amazon:
+        providers.insert(1, _amazon_site_search)
+
+    # Prefer Flipkart first for speed/stability.
+    for provider in providers:
         try:
             # Pull a wider pool from each provider before final ranking.
-            found = provider(product_query, max_results * 8)
+            found = provider(product_query, max_results * 4)
         except Exception:
             found = []
 
